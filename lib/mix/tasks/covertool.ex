@@ -29,11 +29,14 @@ defmodule Mix.Tasks.Covertool do
         cover_data: :no_import
       )
 
-    _ = :cover.start()
-    :cover.import(to_charlist(file))
-    modules = :cover.imported_modules()
-    :cover.modules() |> IO.inspect()
-    Mix.shell().info("Imported #{length(modules)} modules!")
+    _ = :cover.stop()
+    {:ok, pid} = :cover.start()
+    :ok = :cover.import(to_charlist(file))
+
+    # Silence analyse import messages emitted by cover
+    # see https://github.com/elixir-lang/elixir/blob/7b0d4d6707fd221be6a83379a36ca0f4d63c65a7/lib/mix/lib/mix/tasks/test.coverage.ex#L163
+    {:ok, string_io} = StringIO.open("")
+    Process.group_leader(pid, string_io)
 
     :covertool.generate_report(c, :cover.imported_modules())
   end
