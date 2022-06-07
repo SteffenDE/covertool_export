@@ -19,25 +19,31 @@ defmodule Mix.Tasks.Covertool do
     {opts, _} = OptionParser.parse!(args, strict: [file: :string])
     file = Keyword.fetch!(opts, :file)
 
-    {:ok, srcdir} = :file.get_cwd()
+    if File.exists?(file) do
+      {:ok, srcdir} = :file.get_cwd()
 
-    c =
-      CovertoolConfig.config(
-        appname: Keyword.fetch!(Mix.Project.config(), :app),
-        sources: [srcdir],
-        beams: [to_charlist(Mix.Project.compile_path())],
-        cover_data: :no_import
+      c =
+        CovertoolConfig.config(
+          appname: Keyword.fetch!(Mix.Project.config(), :app),
+          sources: [srcdir],
+          beams: [to_charlist(Mix.Project.compile_path())],
+          cover_data: :no_import
+        )
+
+      _ = :cover.stop()
+      {:ok, pid} = :cover.start()
+      :ok = :cover.import(to_charlist(file))
+
+      # Silence analyse import messages emitted by cover
+      # see https://github.com/elixir-lang/elixir/blob/7b0d4d6707fd221be6a83379a36ca0f4d63c65a7/lib/mix/lib/mix/tasks/test.coverage.ex#L163
+      {:ok, string_io} = StringIO.open("")
+      Process.group_leader(pid, string_io)
+
+      :covertool.generate_report(c, :cover.imported_modules())
+    else
+      Mix.shell().info(
+        "#{Path.absname(file)} does not exist. Skipping coverage report generation."
       )
-
-    _ = :cover.stop()
-    {:ok, pid} = :cover.start()
-    :ok = :cover.import(to_charlist(file))
-
-    # Silence analyse import messages emitted by cover
-    # see https://github.com/elixir-lang/elixir/blob/7b0d4d6707fd221be6a83379a36ca0f4d63c65a7/lib/mix/lib/mix/tasks/test.coverage.ex#L163
-    {:ok, string_io} = StringIO.open("")
-    Process.group_leader(pid, string_io)
-
-    :covertool.generate_report(c, :cover.imported_modules())
+    end
   end
 end
